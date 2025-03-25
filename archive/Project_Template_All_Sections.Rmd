@@ -1,0 +1,482 @@
+---
+title: "HARVARD EXTENSION SCHOOL"
+subtitle: "EXT CSCI E-106 Model Data Class Group Project"
+author:
+- John Hur
+- Kacper Lewtak
+- German Paredes
+- Lauren Briese
+- Michael Lefkoe
+- Rajesh Jain
+
+tags: [logistic, neuronal networks, etc..]
+abstract: |
+  This is the location for your abstract.
+
+  It must consist of two paragraphs.
+date: "`r format(Sys.time(), '%d %B %Y')`"
+geometry: margin=1.3cm
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: 2
+  html_document:
+    df_print: paged
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+\newpage
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr)
+HouseSales<-read.csv("KC_House_Sales.csv")
+```
+\newpage
+## House Sales in King County, USA data to be used in the Final Project
+
+| Variable| Description |
+| :-------:| :------- |
+| id| **Unique ID for each home sold (it is not a predictor)**    |
+| date| *Date of the home sale*    |
+| price| *Price of each home sold*    |
+| bedrooms| *Number of bedrooms*    |
+| bathrooms| *Number of bathrooms, where ".5" accounts for a bathroom with a toilet but no shower*    |
+| sqft_living| *Square footage of the apartment interior living space*    |
+| sqft_lot| *Square footage of the land space*    |
+| floors| *Number of floors*    |
+| waterfront| *A dummy variable for whether the apartment was overlooking the waterfront or not*    |
+| view| *An index from 0 to 4 of how good the view of the property was*    |
+| condition| *An index from 1 to 5 on the condition of the apartment,*    |
+| grade| *An index from 1 to 13, where 1-3 falls short of building construction and design, 7 has an average level of construction and design, and 11-13 has a high-quality level of construction and design.*    |
+| sqft_above| *The square footage of the interior housing space that is above ground level*    | 
+| sqft_basement| *The square footage of the interior housing space that is below ground level*    |
+| yr_built| *The year the house was initially built*    |
+| yr_renovated| *The year of the house’s last renovation*    |
+| zipcode| *What zipcode area the house is in*    |
+| lat| *Latitude*    |
+| long| *Longitude*    |
+| sqft_living15| *The square footage of interior housing living space for the nearest 15 neighbors*    |
+| sqft_lot15| *The square footage of the land lots of the nearest 15 neighbors*    |
+\newpage
+## Instructions:
+0.  Join a team with your fellow students with appropriate size (Four Students total)
+1.  Load and Review the dataset named "KC_House_Sales'csv
+2.	Create the train data set which contains 70% of the data and use set.seed (1023). The remaining 30% will be your test data set.
+3.	Investigate the data and combine the level of categorical variables if needed and drop variables as needed. For example, you can drop id, Latitude, Longitude, etc.
+4.	Build a regression model to predict price. 
+5.	Create scatter plots and a correlation matrix for the train data set. Interpret the possible relationship between the response.
+6.	Build the best multiple linear models by using the stepwise selection method. Compare the performance of the best two linear models. 
+7.	Make sure that model assumption(s) are checked for the final model. Apply remedy measures (transformation, etc.) that helps satisfy the assumptions. 
+8.	Investigate unequal variances and multicollinearity. If necessary, apply remedial methods (WLS, Ridge, Elastic Net, Lasso, etc.). 
+9.	Build an alternative model based on one of the following approaches to predict price: regression tree, NN, or SVM.  Check the applicable model assumptions. Explore using a logistic regression. 
+10.	Use the test data set to assess the model performances from above.
+11.	Based on the performances on both train and test data sets, determine your primary (champion) model and the other model which would be your benchmark model.
+12.	Create a model development document that describes the model following this template, input the name of the authors, Harvard IDs, the name of the Group, all of your code and calculations, etc..:
+
+## Due Date: December 18th, 2023 at 11:59 pm EST
+
+**Notes**
+**No typographical errors, grammar mistakes, or misspelled words, use English language**
+**All tables need to be numbered and describe their content in the body of the document**
+**All figures/graphs need to be numbered and describe their content**
+**All results must be accurate and clearly explained for a casual reviewer to fully understand their purpose and impact**
+**Submit both the RMD markdown file and PDF with the sections with appropriate explanations. A more formal document in Word can be used in place of the pdf file but must include all appropriate explanations.**
+
+Executive Summary
+
+This section will describe the model usage, your conclusions and any regulatory and internal requirements. In a real world scneario, this section is for senior management who do not need to know the details. They need to know high level (the purpose of the model, limitations of the model and any issues).
+
+
+\newpage
+## I. Introduction (5 points)
+
+*This section needs to introduce the reader to the problem to be resolved, the purpose, and the scope of the statistical testing applied. What you are doing with your prediction? What is the purpose of the model? What methods were trained on the data, how large is the test sample, and how did you build the model?*
+
+
+\newpage
+## II. Description of the data and quality (15 points)
+
+*Here you need to review your data, the statistical test applied to understand the predictors and the response and how are they correlated. Extensive graph analysis is recommended. Is the data continuous, or categorical, do any transformation needed? Do you need dummies? *
+
+```{r import house sales data}
+# read in data
+kc_house_sales = read.csv('KC_House_Sales.csv')
+
+# get number of N/A values in each column
+colSums(is.na(kc_house_sales))
+
+# get column names, data types, and first few values for each column
+str(kc_house_sales)
+```
+
+The data to be analyzed in this report is a set of housing sales data from King County, USA in the 2014-2015 time frame. The original data set contains 21 columns with 21613 observations. 
+
+```{r drop id, lat, long}
+kc_house_sales = subset(kc_house_sales, select = -c(id, lat, long, sqft_basement))
+```
+
+We dropped the following columns prior to developing our models:  
+* id: This is not a predictor or relevant to the sales data beyond being an identifier for each row.  
+* lat: This level of detail is not necessary, and the zipcode column also approximates location.  
+* long: This level of detail is not necessary, and the zipcode column also approximates location.  
+* sqft_basement: This column is equal to sqft_living - sqft_above, so it does not provide new information and is not necessary.
+
+```{r convert price to numeric}
+# convert the price to a numeric column
+kc_house_sales$price = as.numeric(gsub('\\$|,','',kc_house_sales$price))
+```
+  
+We updated the price column to numeric as it is the response variable which we built the models to predict.
+
+```{r convert date and zip code to character data types}
+# convert zip code to characters so it will create dummy variables
+kc_house_sales$zipcode = as.character(kc_house_sales$zipcode)
+
+# convert date to just years and months, there are 13 unique values
+kc_house_sales$date = substr(kc_house_sales$date, start = 1, stop = 6)
+```
+  
+We treated the following columns as categorical based on their data types and converted the data and zip code columns accordingly:  
+* date: Although they appear to be numeric, date should be treated as categorical data. Date was grouped by month to avoid having hundred of individual variables.  
+* zipcode: Although they appears to be numbers, zip codes are not numeric and instead should be treated as categorical data.  
+* waterfront: As mentioned in the description provided with this data set, this is a dummy variable to indicate whether the property overlooks the water.
+
+```{r data correlation for numeric variables}
+# get correlation of numeric data, rounded for ease of review)
+kc_house_sales_numeric = subset(kc_house_sales, select = -c(date, waterfront, zipcode))
+round(cor(kc_house_sales_numeric),3)
+```
+  
+Looking at the correlation matrix above for the numeric columns in the data set, price appears to be most correlated with the fields sqft_living (0.702), grade (0.667), and sqft_above (0.606). Note that the categorical variables date, waterfront, and zipcode are not included in the correlation matrix.
+
+The sqft_living and sqft_above variables have a high correlation; it may be worth including only one of these in the model. For houses without basements, the sqft_living and sqft_above values should be equal.
+  
+The following sections describe the response variable (price) and the predictor variables to be analyzed for inclusion or exclusion from the data models.
+
+### Price
+```{r price scatter plots, box plots, histograms}
+# price box plot and histogram
+par(mfrow=c(1,2))
+boxplot(kc_house_sales$price, main = "Figure 2-1. price Box Plot")
+hist(kc_house_sales$price, main = "Figure 2-2. price Distribution")
+mean(kc_house_sales$price)
+median(kc_house_sales$price)
+```
+  
+We updated the price column to a numeric column since it could not be analyzed with the character type. The median sales price for the observations was \$450,000, and the average was \$540,088.10. Per Figure 2-1, it appears as though there are many outliers in the data on the higher end of the price range. Figure 2-2 confirms this assumption, showing that the distribution of sales prices has a much higher frequency at the lower end of the range.
+
+
+### Bedrooms
+```{r bedrooms scatter plots, box plots, histograms}
+# bedrooms box plot, histogram, scatter plot vs. price
+par(mfrow=c(1,2))
+boxplot(kc_house_sales$bedrooms, main = "Figure 2-3. bedrooms Box Plot")
+hist(kc_house_sales$bedrooms, main = "Figure 2-4. bedrooms  Distribution")
+par(mfrow=c(1,1))
+plot(kc_house_sales$bedrooms, kc_house_sales$price,  main = "Figure 2-5. bedrooms Scatter Plot")
+```
+  
+Looking at the number of bedrooms and the box plot in Figure 2-3, there are outliers on the lower and upper ends of the range of bedroom values, with one observation having more than 30 bedrooms. Per Figure 2-4, it appears as though the vast majority of houses have between two and four bedrooms. It would be interesting to know the state of the "houses" with 0 bedrooms--are these studio apartments, cabins, plots of bare land, houses that have been gutted or otherwise have no interiors and thus no bedrooms, commercial properties accidentally included in the data set, or is there another explanation?  
+
+Figure 2-5 displays what appears to be a curvilinear relationship between the number of bedrooms and the house price, increasing until reaching five bedrooms and then falling again. 
+
+### Bathrooms
+```{r bathrooms scatter plots, box plots, histograms}
+# bathrooms box plot, histogram, scatter plot vs. price
+par(mfrow=c(1,2))
+boxplot(kc_house_sales$bathrooms, main = "Figure 2-6. bathrooms Box Plot")
+hist(kc_house_sales$bathrooms, main = "Figure 2-7. bathrooms Distribution")
+par(mfrow=c(1,1))
+plot(kc_house_sales$bathrooms, kc_house_sales$price,  main = "Figure 2-8. bathrooms Scatter Plot")
+```
+  
+The bathroom predictor variable presented confusion upon first glance. Assuming the data is for residential real estate in the King County district, it seems odd that it would be possible for a house to have less than one full bathroom, yet there were multiple observations with less than 1.0 bathroom (and some with 0 bathrooms or fractions of a bathroom ending in .25). Upon researching the definitions used for bathroom terminology in the real estate industry [2], it appears as though each major component of a bathroom--toilet, sink, shower, and tub--counts as 0.25. It might have been more interesting for the bathroom data to be split into two columns: full_bathrooms and partial_bathrooms since, for example, if a house has 2 bathrooms according to the data set, it is unclear whether that means two full bathrooms, one full bathroom and two half bathrooms (toilet and sink), or another configuration. As for the houses with less than 1.0 bathroom, it would be interesting to know the reason--is the house unfinished? Is it a tiny house with just a composting toilet in the bathroom?
+
+Overall, per Figure 2-6 and Figure 2-7, most houses have around 2 bathrooms, with outliers at the lower and upper end of the ranges. Per Figure 2-8, it appears as though there is a linear relationship between number of bathrooms and price of the house.
+
+### Square Footage - Lot
+```{r housing square footage lot scatter plots, box plots, histograms}
+# sqft_lot box plot, histogram, scatter plot vs. price
+par(mfrow=c(1,2))
+boxplot(kc_house_sales$sqft_lot, main = "Figure 2-9. sqft_lot Box Plot")
+hist(kc_house_sales$sqft_lot, main = "Figure 2-10. sqft_lot Distribution")
+par(mfrow=c(1,1))
+plot(kc_house_sales$sqft_lot, kc_house_sales$price,  main = "Figure 2-11. sqft_lot Scatter Plot")
+```
+
+Per Figure 2-9 and Figure 2-10 showing the box plot and distribution of the sqft_lot it appears as though the lot size is very concentrated around the lower end of the spectrum, with a few extreme outliers. According to the scatter plot in Figure 2-11, it looks like there is somewhat of a negative linear relationship between lot size and house price.
+
+Looking at some of the individual data points, it seems as though some of the lot sizes might be impossible considering the square footage of the living area.  For example, the row with ID 9828702895 has a sqft_lot size of 520, a sqft_living of 2420, no basement (sqft_above is also 2420), and only 1.5 floors. With only 1.5 floors and no basement, it does not seem possible to have a square footage of 2420 sqft on a lot size of 520 sqft, considering that the lot size typically includes the house's footprint [3]. Unfortunately, without further clarification, it is not possible to exclude data points based on this rationale. The "square footage of the land space" definition provided with the data set could mean the land excluding the house's footprint.
+
+### Square Footage - Living
+```{r housing square footage living scatter plots, box plots, histograms}
+# sqft_living box plot, histogram, scatter plot vs. price
+par(mfrow=c(1,2))
+boxplot(kc_house_sales$sqft_living, main = "Figure 2-12. sqft_living Box Plot")
+hist(kc_house_sales$sqft_living, main = "Figure 2-13. Distribution of sqft_living")
+par(mfrow=c(1,1))
+plot(kc_house_sales$sqft_living, kc_house_sales$price,  main = "Figure 2-14. sqft_living Scatter Plot")
+```
+  
+Per Figure 2-12 and 2-13, the median square footage of living space appears to be around 2000 sqft, with outliers present at the higher end of the range.
+
+Per Figure 2-14, there appears to be a linear relationship between square feet of living space and price, with price increasing as the square footage increases.  
+
+### Square Footage - Above Ground
+```{r housing square footage above scatter plots, box plots, histograms}
+# sqft_above box plot, histogram, scatter plot vs. price
+par(mfrow=c(1,2))
+boxplot(kc_house_sales$sqft_above, main = "Figure 2-15. sqft_above Box Plot")
+hist(kc_house_sales$sqft_above, main = "Figure 2-16. sqft_above Distribution")
+par(mfrow=c(1,1))
+plot(kc_house_sales$sqft_above, kc_house_sales$price,  main = "Figure 2-17. sqft_above Scatter Plot")
+```
+
+  
+Per Figure 2-15 and 2-16, the median square footage above ground appears to be slightly less than 2000 sqft, with outliers present at the higher end of the range.
+
+Per Figure 2-17, there appears to be a linear relationship between square feet of living space and price, with price increasing as the square footage increases.  
+
+### Floors
+```{r floors scatter plots, box plots, histograms}
+# floors box plot, histogram, scatter plot vs. price
+par(mfrow=c(1,2))
+boxplot(kc_house_sales$floors, main = "Figure 2-18. floors Box Plot")
+hist(kc_house_sales$floors, main = "Figure 2-19. floors Distribution")
+par(mfrow=c(1,1))
+plot(kc_house_sales$floors, kc_house_sales$price,  main = "Figure 2-20. floors Scatter Plot")
+```
+  
+Per Figures 2-18, the median house has 1.5 floors, and there are no outliers in the data set. Although the median is 1.5 floors, looking at the distribution in Figure 2-19, most houses have either 1 floor or 2 floors.
+
+Looking at Figure 2-20, there appears to be a nonlinear relationship between nnumber of floors and price. Houses with 1 floor or 2 floors appear to have a wider price range with higher maximum prices than houses with a fractional floor or those with 3 foors.
+
+### View
+```{r view scatter plots, box plots, histograms}
+# view box plot, histogram, scatter plot vs. price
+par(mfrow=c(1,2))
+boxplot(kc_house_sales$view, main = "Figure 2-21. view Box Plot")
+hist(kc_house_sales$view, main = "Figure 2-22. view Distribution")
+par(mfrow=c(1,1))
+plot(kc_house_sales$view, kc_house_sales$price,  main = "Figure 2-23. view Scatter Plot")
+```
+  
+Looking at Figure 2-21 and Figure 2-22, most houses do not have a view; according to the box plot, any house with a view appears to be an outlier. Per Figure 2-23, the price does not seem to increase or decrease depending on the house's view.
+
+### Condition
+```{r condition scatter plots, box plots, histograms}
+# condition box plot, histogram, scatter plot vs. price
+par(mfrow=c(1,2))
+boxplot(kc_house_sales$condition, main = "Figure 2-24. condition Box Plot")
+hist(kc_house_sales$condition, main = "Figure 2-25. condition Distribution")
+par(mfrow=c(1,1))
+plot(kc_house_sales$condition, kc_house_sales$price,  main = "Figure 2-26. condition Scatter Plot")
+```
+
+  
+The box plot in Figure 2-24 indicates that the median house has a condition of 3, which is average, and houses with a condition of 1 are outliers. Figure 2-25 with the distribution again shows that the vast majority of houses have a condition of 3. Interestingly, in the scatter plot in Figure 2-26, it appears as though if the condition is at least 3, there is not much of an impact on housing price, but below 3 and the price decreases.
+
+### Grade
+```{r grade scatter plots, box plots, histograms}
+# grade box plot, histogram, scatter plot vs. price
+par(mfrow=c(1,2))
+boxplot(kc_house_sales$grade, main = "Figure 2-27. grade Box Plot")
+hist(kc_house_sales$grade, main = "Figure 2-28. grade Distribution")
+par(mfrow=c(1,1))
+plot(kc_house_sales$grade, kc_house_sales$price,  main = "Figure 2-29. grade Scatter Plot")
+```
+  
+According to the box plot and histogram in Figure 2-27 and 2-28, the median grade appears to be 7, which is an "average" quality, and outliers are any grade outside the range of 6 to 9. The scatter plot in Figure 2-29 indicates that grade appears to have a linear relationship with prices, with the price increasing as the grade of the house increases.
+
+### Neighbor Square Footage - Lot
+```{r neighbor square footage lot scatter plots, box plots, histograms}
+# sqft_lot15 box plot, histogram, scatter plot vs. price
+par(mfrow=c(1,2))
+boxplot(kc_house_sales$sqft_lot15, main = "Figure 2-30. sqft_lot15 Box Plot")
+hist(kc_house_sales$sqft_lot15, main = "Figure 2-31. sqft_lot15 Distribution")
+par(mfrow=c(1,1))
+plot(kc_house_sales$sqft_lot15, kc_house_sales$price,  main = "Figure 2-32. sqft_lot15 Scatter Plot")
+```
+  
+According to the box plot and histogram in Figure 2-30 and 2-31 TBD. The scatter plot in Figure 2-32 appears to show somewhat of a negative linear relationship between price and the square footage of lot size of the nearest 15 neighbors. Perhaps houses closer to the city center, which likely have smaller lot sizes, are worth more.
+
+### Neighbor Square Footage - Living
+```{r neighbor square footage living scatter plots, box plots, histograms}
+# sqft_living15 box plot, histogram, scatter plot vs. price
+par(mfrow=c(1,2))
+boxplot(kc_house_sales$sqft_living15, main = "Figure 2-33. sqft_living15 Box Plot")
+hist(kc_house_sales$sqft_living15, main = "Figure 2-34. sqft_living15 Distribution")
+par(mfrow=c(1,1))
+plot(kc_house_sales$sqft_living15, kc_house_sales$price,  main = "Figure 2-35. sqft_living15 Scatter Plot")
+```
+According to the box plot and histogram in Figure 2-33 and 2-34 TBD. The scatter plot in Figure 2-35 shows a linear relationship between the square footage of living space of the 15 nearest neighbors and price. 
+
+\newpage
+## III. Model Development Process (15 points)
+
+*Build a regression model to predict price.  And of course,  create the train data set which contains 70% of the data and use set.seed (1023). The remaining 30% will be your test data set. Investigate the data and combine the level of categorical variables if needed and drop variables. For example, you can drop id, Latitude, Longitude, etc. *
+
+\newpage
+## IV. Model Performance Testing (15 points)
+
+*Use the test data set to assess the model performances. Here, build the best multiple linear models by using the stepwise both ways selection method. Compare the performance of the best two linear models. Make sure that model assumption(s) are checked for the final linear model. Apply remedy measures (transformation, etc.) that helps satisfy the assumptions. In particular you must deeply investigate unequal variances and multicollinearity. If necessary, apply remedial methods (WLS, Ridge, Elastic Net, Lasso, etc.). *
+
+
+\newpage
+## V. Challenger Models (15 points)
+
+*Build an alternative model based on one of the following approaches to predict price: regression tree, NN, or SVM. Explore using a logistic regression. Check the applicable model assumptions. Apply in-sample and out-of-sample testing, backtesting and review the comparative goodness of fit of the candidate models. Describe step by step your procedure to get to the best model and why you believe it is fit for purpose.*
+
+```{r}
+###########
+#Data Prep
+###########
+#Read data
+sales_data <- read.csv("/cloud/project/Class Group Project/KC_House_Sales.csv")
+
+#Remove columns that are not needed
+sales_data <- subset(sales_data, select = -c(id, date, lat, long, sqft_basement)) 
+
+#Clean up price column
+sales_data$price = gsub("[$,]", "", sales_data$price) 
+sales_data$price = as.numeric(sales_data$price) 
+
+#Change ZipCode to factor
+sales_data$zipcode = as.factor(sales_data$zipcode)
+
+#Create Train and Test dfs
+set.seed(1023)
+n <- dim(sales_data)[1]
+IND <- sample(c(1:n),n*0.7)
+train_data <- sales_data[IND,]
+test_data <- sales_data[-IND,]
+```
+
+```{r}
+#Create Regression Tree
+library(rpart)
+reg_tree <- rpart(price ~ ., data = train_data, cp=0.001) #using cp of 0.001 improved the model.
+reg_tree
+```
+
+```{r}
+#plot tree
+library(rpart.plot)
+rpart.plot(reg_tree, digits = 3)
+```
+
+```{r}
+#evaluating model performance
+##########################
+#OUT OF SAMPLE TEST (Test Data)
+##########################
+#Predict values using test data
+price_predict <- predict(reg_tree, test_data)
+summary(price_predict) #summary of predicted values
+
+summary(test_data$price) #summary of actual values
+
+cor(price_predict, test_data$price)
+
+#Measuring performance with the mean absolute error
+MAE <- function(actual, predicted) {mean(abs(actual - predicted))}
+
+#The MAE for our predictions is then:
+MAE(test_data$price, price_predict)
+
+#Measuring performance with the SSE
+SSE <- function(actual, predicted) {sum((actual - predicted)^2)}
+SSE(test_data$price, price_predict)
+
+#Measuring performance with the R-square
+R2 <- function(actual, predicted) {sum((actual - predicted)^2)/((length(actual)-1)*var(actual))}
+1 - R2(test_data$price, price_predict)
+```
+
+```{r}
+#evaluating model performance
+##########################
+#IN SAMPLE TEST (Train Data)
+##########################
+
+price_predict <- predict(reg_tree, train_data)
+summary(price_predict) #summary of predicted values
+
+summary(train_data$price) #summary of actual values
+
+cor(price_predict, train_data$price)
+
+#Measuring performance with the mean absolute error
+MAE <- function(actual, predicted) {mean(abs(actual - predicted))}
+
+#The MAE for our predictions is then:
+MAE(train_data$price, price_predict)
+
+#Measuring performance with the SSE
+SSE <- function(actual, predicted) {sum((actual - predicted)^2)}
+SSE(train_data$price, price_predict)
+
+#Measuring performance with the R-square
+R2 <- function(actual, predicted) {sum((actual - predicted)^2)/((length(actual)-1)*var(actual))}
+1 - R2(train_data$price, price_predict)
+
+```
+
+**Model Results**
+
+* **Out-Of-Sample Results**
+    + Correlation: 0.8846356
+    + MAE: 97456.69
+    + SSE: 2.031268e+14
+    + R-Squared: 0.7824997
+
+* **In-Sample Results**
+    + Correlation: 0.915282
+    + MAE: 90145.88
+    + SSE: 3.210949e+14
+    + R-Squared: 0.8377412
+
+**Steps to create the Regression Tree**
+
+- Load the data and remove the unnecessary variables (same as the ones removed in the regression models)
+- Split df into test and train datasets
+- Create a Regression Tree to predict Price while using the train dataset, and a cp of 0.001
+- Perform out-of-sample and in-sample tests for the model
+- For both tests:
+-     Get the predicted values using the test and train datasets respectively
+-     Get the summary of the predicted values and compare it againts the summary of the actual values in the Test/Train dataset
+-     Calculate the correlation between the predicted and actual values
+-     Calculate the MAE, SSE, and R-squared of the model
+- Once all three metrics have been calculated, compare the results with the results of the previous regression models.
+
+\newpage
+## VI. Model Limitation and Assumptions (15 points)
+
+*Based on the performances on both train and test data sets, determine your primary (champion) model and the other model which would be your benchmark model. Validate your models using the test sample. Do the residuals look normal? Does it matter given your technique? How is the prediction performance using Pseudo R^2, SSE, RMSE?  Benchmark the model against alternatives. How good is the relative fit? Are there any serious violations of the model assumptions? Has the model had issues or limitations that the user must know? (Which assumptions are needed to support the Champion model?)* 
+
+
+\newpage
+## VII. Ongoing Model Monitoring Plan (5 points)
+
+*How would you picture the model needing to be monitored, which quantitative thresholds and triggers would you set to decide when the model needs to be replaced? What are the assumptions that the model must comply with for its continuous use?*
+
+
+\newpage
+## VIII. Conclusion (5 points)
+
+*Summarize your results here. What is the best model for the data and why?*
+
+## Bibliography (7 points)
+
+[1] Board of Governors of the Federal Reserve System. *SR Letter 11-7: Supervisory Guidance on Model Risk Management.* 2011.  [https://www.federalreserve.gov/supervisionreg/srletters/sr1107a1.pdf](https://www.federalreserve.gov/supervisionreg/srletters/sr1107a1.pdf).
+
+[2] Yuko, Elizabeth. *The Actual Difference Between a Half, 3/4, and Full Bathroom*. April 10, 2012. [https://lifehacker.com/the-actual-difference-between-a-half-3-4-and-full-bat-1848773483](https://lifehacker.com/the-actual-difference-between-a-half-3-4-and-full-bat-1848773483).
+
+[3] Pacheco, Kaitlyn. *The 2022 U.S. Lot Size Index*. Augut 5, 2022. [https://www.angi.com/articles/lot-size-index.htm](https://www.angi.com/articles/lot-size-index.htm).
+
+## Appendix (3 points)
+
+*Please add any additional supporting graphs, plots and data analysis.*
+
+

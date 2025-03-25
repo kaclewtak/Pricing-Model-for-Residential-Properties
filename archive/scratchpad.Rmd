@@ -1,0 +1,333 @@
+---
+title: "Final Project Scratch Notebook"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+```{r}
+## Helper to display regression function with n coefficients
+dispRegFunc <- function(reg) {
+  coefs <- reg$coefficients
+  b0 = coefs[1]
+  n <- length(coefs)
+  my_formula <- paste0("Y = ", round(b0, digits = 6))
+  for (i in 2:n) {
+    my_formula <- paste0(my_formula, " + ", round(coefs[i],6), names(coefs)[i])
+  }
+  my_formula
+}
+```
+
+Step 0: joined team
+
+Step 1: Load Data and review variables
+```{r setup, echo=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# Import libraries
+library(readr)
+library(ggplot2)
+library(corrplot)
+library(MASS)
+library(datasets)
+library(olsrr)
+library(car)
+theme_set(theme_bw())
+
+# Import data and adjust settings
+HouseSales<-read.csv("KC_House_Sales.csv")
+set.seed (1023)
+options("scipen" = 10)
+
+# Check for NA's
+str(HouseSales)
+#check for missing and NAs
+apply(HouseSales,2,function(x) sum(is.na(x)))
+
+# Cleaning the Price column
+summary(HouseSales)
+head(HouseSales$price)
+
+HouseSales$price<-gsub(" ","",as.character(HouseSales$price))
+HouseSales$price[1]
+
+HouseSales$price<-gsub("\\$","",as.character(HouseSales$price))
+HouseSales$price[1]
+
+HouseSales$price<-gsub(",","",as.character(HouseSales$price))
+HouseSales$price[1]
+
+
+HouseSales$price <- as.numeric(HouseSales$price)
+summary(HouseSales)
+
+# Cleaning the date column
+head(HouseSales$date)
+
+HouseSales$date <-gsub("T.*","",HouseSales$date)
+HouseSales$date[1]
+
+year <- substr(HouseSales$date, 0, 4)
+month <- substr(HouseSales$date, 5, 6)
+day <- substr(HouseSales$date, 7, 8)
+```
+
+
+Step 2: Divide Data into train and test sets, 70/30 split
+```{r divide data, include=FALSE}
+n <- dim(HouseSales)[1]
+ind = sample(c(1:n), n*0.7)
+H.train <- HouseSales[ind,]
+H.test <- HouseSales[-ind,]
+```
+
+
+Step 3: Inspect Data and Drop variables, create categorical variables
+```{r Dropping variables}
+#summary(H.train)
+
+# Dropping unneeded variables
+drop <- c("id","lat","long", "date", "zipcode", "sqft_basement")
+df = H.train[,!(names(H.train) %in% drop)]
+df.test = H.test[,!(names(H.test) %in% drop)]
+summary(df)
+attach(df)
+```
+
+```{r plot inspection}
+# boxplots for starting reference
+par(mfrow=c(2,2))
+g1 <- ggplot(H.train, aes(sqft_living))
+g1 + geom_boxplot(varwidth=T, fill="plum") + 
+    labs(title="Box plot", 
+         subtitle="Total Interior Square Footage",
+         caption="Source: HouseSales",
+         x="Square Feet of Interior Living Space")
+
+g2 <- ggplot(H.train, aes(sqft_lot))
+g2 + geom_boxplot(varwidth=T, fill="orange") + 
+    labs(title="Box plot", 
+         subtitle="Total Lot (Exterior) Square Footage",
+         caption="Source: HouseSales",
+         x="Square Feet of Lot Space")
+
+g3 <- ggplot(H.train, aes(sqft_above))
+g3 + geom_boxplot(varwidth=T, fill="green") + 
+    labs(title="Box plot", 
+         subtitle="Total Interior Square Footage Above Ground Level",
+         caption="Source: HouseSales",
+         x="Square Feet of Interior Living Space Above Ground Level")
+
+g4 <- ggplot(H.train, aes(sqft_basement))
+g4 + geom_boxplot(varwidth=T, fill="cyan") + 
+    labs(title="Box plot", 
+         subtitle="Total Interior Basement Square Footage",
+         caption="Source: HouseSales",
+         x="Square Feet of Interior Living Space Below Ground Level")
+
+g5 <- ggplot(H.train, aes(price))
+g5 + geom_boxplot(varwidth=T, fill="chocolate") + 
+    labs(title="Box plot", 
+         subtitle="Price",
+         caption="Source: HouseSales",
+         x="Price")
+
+g5 <- ggplot(H.train, aes(sqft_living15))
+g5 + geom_boxplot(varwidth=T, fill="coral") + 
+    labs(title="Box plot", 
+         subtitle="Total Interior Basement Square Footage",
+         caption="Source: HouseSales",
+         x="Square Feet of Interior Living Space Below Ground Level")
+
+g6 <- ggplot(H.train, aes(sqft_lot15))
+g6 + geom_boxplot(varwidth=T, fill="azure2") + 
+    labs(title="Box plot", 
+         subtitle="Total Interior Basement Square Footage",
+         caption="Source: HouseSales",
+         x="Square Feet of Interior Living Space Below Ground Level")
+
+```
+
+Step 4: Build regression model to predict price
+```{r model}
+summary(df)
+class(df)
+#H.full <- lm(price ~ ., data=df)
+H.full <- lm(price ~ bedrooms + bathrooms + sqft_living + sqft_lot + floors + waterfront + view + condition + grade + sqft_above + yr_built + yr_renovated + sqft_living15 + sqft_lot15)
+summary(H.full)
+plot(H.full)
+```
+
+Step 5: Creating scatter plots and correlation matrix for the train data + result interpretation
+
+**Interpretation:**
+
+|       Scatter Plots: 
+|
+|       Correlation Matrix: The matrix shows some issues of multi-collinearity are appearing with several of the variables. We can see that sqft_living is strongly correlated with sqft_above (0.87). This makes sense as these two values are closely related with each other. Usually much of the livable space of a house is also located above ground level, hence the relationship. Additional string correlations are seen between sqft_above & grade(0.76), sqft_above & sqft_above15(0.76), sqft_living & price(0.7), as well as several others. As a result of these correlations, we will have to address issues of multi-collinearity within our model.
+|
+|       VIF helps determine the severity of multicollinearity. Previous concerns with sqft_living and sqft_above seem to hold some weight as these two predictors have the heighest VIFs, though still below our decision point of $VIF < 10$.
+
+```{r Scatter plots}
+# Scatter plots needed: Leverages vs. Index,  Residuals vs Leverage, hat matrix, Studentized Residuals vs. Leverage, 
+n <- nrow(df)
+p <- length(H.full$coefficients)
+hii<- hatvalues(H.full)
+
+
+# Hat Matrix
+plot(sqft_living~bathrooms, pch=16 )
+text(bathrooms +0.5, sqft_living,
+labels=as.character(1:length(bathrooms)),col="red")
+index<-hii>2*p/n
+points( bathrooms[index], sqft_living[index], cex=2.0, col="blue")
+```
+
+
+```{r Scatter plots2}
+# Residuals vs. Leverage
+plot(H.full, which=5, main='Average total score on the SAT, 1994-95')
+
+# Leverages vs. Index
+
+plot(hii, ylab="Leverages",main="Leverages vs Index Plot")
+abline(h=2*p/n,col="red")
+
+####Studentized Residuals vs Leverage Plot ####
+#Graph for detecting influential observations.
+
+ols_plot_resid_lev(H.full)
+```
+
+
+```{r Scatter plots4}
+# Scatter plots
+ggplot(df, aes(sqft_living15, price)) +
+   geom_point() +
+   ggtitle("Scatter Plot")
+ggplot(df, aes(sqft_lot, price)) +
+   geom_point() +
+   ggtitle("Scatter Plot")
+ggplot(df, aes(sqft_above, price)) +
+   geom_point() +
+   ggtitle("Scatter Plot")
+ggplot(df, aes(floors, price)) +
+   geom_point() +
+   ggtitle("Scatter Plot")
+
+ggplot(df, aes(H.full$fitted.values, H.full$residuals)) +
+   geom_point() +
+   ggtitle("Scatter Plot")
+```
+
+
+```{r Scatter plots5}
+# Correlation Matrix
+cor_matrix <- round(cor(df),3)
+
+cor_matrix
+
+corrplot(cor_matrix, method="number", addCoef.col = 1,number.cex = 0.5, tl.cex = 0.7)
+```
+
+
+```{r Scatter plots6}
+# Supporting VIF for multicollinearity
+vif(H.full)
+```
+
+```{r}
+boxcox(H.full,seq(-1,1,0.1))
+```
+
+
+
+
+Step 6: Build the best multiple linear models by using the stepwise selection method. Compare the performance of the best two linear models.
+
+|       First model is made using the best subset selection method
+
+```{r stepwise selection}
+# Step 1: Variable validation using: best_subset, 
+
+# BE CAREFUL WHEN RUNNING THIS BLOCK AS IT IS COMPUTE INTENSIVE
+k1<-ols_step_best_subset(H.full)
+k1
+plot(k1,guide="none")
+summary(k1)
+```
+
+
+```{r stepwise selection2}
+k2 <- ols_step_backward_p(H.full, prem = 0.05)
+k2
+plot(k2)
+```
+```{r}
+library(leaps)
+k3 <- regsubsets(price~., data=df)
+rs<-summary(k3)
+
+# Plotting the adjusted R-square values against number of parameters
+plot(2:9, rs$adjr2, xlab="Number of Parameters", ylab="Adjusted R-square")
+which.max(rs$adjr2)
+
+# Plotting the CP values against number of parameters
+plot(2:9, rs$cp, xlab="Number of Parameters", ylab="Cp Statistic")
+abline(0,1)
+
+rs$which
+k4 <- lm(price ~ sqft_living + grade + yr_built + waterfront + view + bedrooms + bathrooms + sqft_lot15, data=df)
+ols_mallows_cp(k4, H.full)
+summary(k4)
+par(mfrow=c(2,2))
+plot(k4)
+dispRegFunc(k4)
+```
+
+
+
+
+```{r stepwise selection3, include=FALSE, echo=FALSE}
+
+
+
+# Ignore thise code, this is all extra carry over 
+#
+#
+#
+#
+#
+
+
+#k2 <- ols_step_backward_p(H.full,prem = 0.05,details=FALSE)
+#k2
+# Step 1: Centering the variables due to high levels of correlation between the variables, will be testing interaction terms
+#wealth <- fort.dat$wealth
+#age <- scale(fort.dat$age, scale=FALSE)
+#rA <- fort.dat$region_A
+#rE <- fort.dat$region_E
+#rM <- fort.dat$region_M
+#rO <- fort.dat$region_O
+#rU <- fort.dat$region_U
+
+# Step 2: Backwards stepwise
+#fort.full <- lm(wealth ~ age + rA + rE + rM + rO + rU + age:rA + age:rE + age:rM + age:rO + age:rU)
+#summary(fort.full)
+#back.m <- ols_step_backward_p(fort.full)
+#back.m
+#fort.back <- lm(wealth ~ rA + rE + rM + rO  + age:rM + age:rU)
+#summary(fort.back)
+#par(mfrow=c(2,2))
+#plot(fort.back)
+
+# Step 3: Forwards stepwise
+#step.m <-ols_step_forward_p(fort.full, penter = 0.05)
+#step.m
+#fort.step <- lm(wealth ~ rM)
+#summary(fort.step)
+#par(mfrow=c(2,2))
+#plot(fort.step)
+```
+
